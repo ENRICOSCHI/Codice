@@ -1,0 +1,1528 @@
+package com.takaaki.urcap.eipmonitor.impl.iomonitor;
+
+import java.awt.event.ActionEvent;
+
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+
+import javax.swing.*;
+import java.awt.event.MouseEvent;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridLayout;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.LineBorder;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.DefaultTableModel;
+
+import com.takaaki.urcap.eipmonitor.impl.EthernetIPMonitorInstallationNodeContribution;
+import com.takaaki.urcap.eipmonitor.impl.component.*;
+import com.takaaki.urcap.eipmonitor.impl.converter.TypeConverter;
+import com.takaaki.urcap.eipmonitor.impl.dialog.*;
+import com.takaaki.urcap.eipmonitor.impl.realtime.RealTimeClient;
+import com.takaaki.urcap.eipmonitor.impl.rtde.*;
+import com.ur.urcap.api.domain.URCapAPI;
+import com.ur.urcap.api.domain.io.BooleanRegister;
+import com.ur.urcap.api.domain.io.FloatRegister;
+import com.ur.urcap.api.domain.io.IntegerRegister;
+
+
+/* Frame */
+public class IOMonitorFrame extends DialogFrame {
+	 private static File selectedFile; //variabile per leggere il file inserito con il bottone
+	//modifica qui la grandezza dell'array
+	public static int ArraySize =24;
+	
+	
+	
+    RTDEClientOfBitRegister rtdeClientOfBitRegister;
+    RTDEClientOfIntegerRegister rtdeClientOfIntegerRegister;
+    RTDEClientOfDoubleRegister rtdeClientOfDoubleRegister;
+
+    private JPanel panel;
+    private JLabel label_title;
+
+    private static final long serialVersionUID = 1L;
+   
+    private JButton btn_hide;
+    private JButton buttcsv;
+    private JButton buttvnc;
+    private File selectedScriptFile;
+    private JLabel imageLabel;
+    private IdxLabel[] label_inputTitle;
+    private IdxLabel[] label_outputTitle;
+    private IdxLabel[] label_inputValue;
+    private IdxLabel[] label_outputValue;
+    private IdxRadioButton[] radio_mode;
+
+    private ButtonGroup group_radio;
+
+    private Box box_title;
+    private Box box_radios;
+    private Box[] box_iovalue;
+
+    private final String TITLE = "";
+    private final String BTN_HIDE = "Close";
+    private final String BUTTCSV = "Scegli File";
+    private final String BUTTVNC= "Abilita VNC";
+
+    private final int FRAME_WIDTH = 1220;
+    private final int FRAME_HEIGHT = 920;
+
+    private final int TITLE_WIDTH = 520;
+    private final int TITLE_HEIGHT = 50;
+    private final int TITLEIO_WIDTH = 200;
+    private final int TITLEIO_HEIGHT = 28;
+    private final int VALUEIO_WIDTH = 70;
+    private final int VALUEIO_HEIGHT = 28;
+    private final int BUTTON_WIDTH = 200;
+    private final int BUTTON_HEIGHT = 60;
+    private final int LEFT_PADDING = 100;
+
+    private final int MODE_BITS = 0;
+    private final int MODE_INTEGERS = 1;
+    private final int MODE_FLOATS = 2;
+    
+
+
+    private final int FREQ_BITS = 50;
+    private final int FREQ_INTEGERS = 50;
+    private final int FREQ_FLOATS = 50;
+   
+
+    private final Color BACKCOLOR = new Color(255, 255, 255);
+    private final Color DEFAULT_FORECOLOR = new Color(0, 0, 0);
+    private final Color ON_COLOR = Color.RED;
+    private final Color NOUSE_COLOR = Color.BLACK;
+
+    private Font TITLE_FONT = new Font("Lucida Sans", Font.BOLD, 24);
+    private Font BUTTON_FONT = new Font("Lucida Sans", Font.BOLD, 20);
+    private Font DEFAULT_FONT = new Font("Lucida Sans", Font.BOLD, 15);
+    private Font RADIO_FONT = new Font("Lucida Sans", Font.BOLD, 24);
+
+    private int prev_input_0to31 = 0;
+    private int prev_input_32to63 = 0;
+    private int prev_output_0to31 = 0;
+    private int prev_output_32to63 = 0;
+    //non toccare da errore
+    private boolean[] isDefinedInputBits = new boolean[64];
+    private boolean[] isDefinedOutputBits = new boolean[64];
+
+    private boolean[] isDefinedInputIntegers = new boolean[64];
+    private boolean[] isDefinedOutputIntegers = new boolean[64];
+
+    private boolean[] isDefinedInputFloats = new boolean[64];
+    private boolean[] isDefinedOutputFloats = new boolean[64];
+
+    private EthernetIPMonitorInstallationNodeContribution contribution;
+
+    /**
+     * costruttore
+     * 
+     * @param contribution Installa oggetto attributi nodo
+     */
+    public IOMonitorFrame(EthernetIPMonitorInstallationNodeContribution contribution) {
+        super();
+
+        this.contribution = contribution;
+
+        createForm();
+        setEventHandlers();
+
+    }
+    private static File GetFileRead() {
+    	return selectedFile;
+    }
+    /**
+     * フォームの形成
+     */
+    private void createForm() {
+        /* Inizializzazione di ogni oggetto */
+
+        panel = new JPanel();
+        label_title = new JLabel(TITLE);
+        btn_hide = new JButton(BTN_HIDE);
+        buttcsv = new JButton(BUTTCSV);
+        buttvnc = new JButton(BUTTVNC);
+        
+        ImageIcon imageIcon = new ImageIcon("/home/ur/sdk/sdk-1.13.0/com.takaaki.urcap.eipmonitor-master/logo-1.png");
+        imageLabel = new JLabel();
+        imageLabel.setIcon(imageIcon);
+        
+        
+        
+        JScrollPane scrollPane = new JScrollPane();
+        radio_mode = createRadioButtonArray(3);
+        label_inputTitle = createLabelArray(64);
+        label_outputTitle = createLabelArray(64);
+        label_inputValue = createLabelArray(64);
+        label_outputValue = createLabelArray(64);
+        box_title = Box.createHorizontalBox();
+        box_radios = Box.createHorizontalBox();
+        box_iovalue = createHorizontalBoxArray(32);
+
+        /* formazione della forma */
+
+        this.setAlwaysOnTop(true);
+        this.setSize(FRAME_WIDTH, FRAME_HEIGHT);
+        this.setLocation(400,400);
+        this.setUndecorated(true);
+        this.setFont(DEFAULT_FONT);
+
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(new LineBorder(Color.BLACK, 2));
+        panel.setBackground(BACKCOLOR);
+
+        /* Formazione dei componenti */
+        setFixedSize(label_title, TITLE_WIDTH, TITLE_HEIGHT);
+
+        label_title.setText(TITLE);
+        label_title.setFont(TITLE_FONT);
+        label_title.setForeground(DEFAULT_FORECOLOR);
+        label_title.setHorizontalAlignment(JLabel.LEFT);
+
+        group_radio = new ButtonGroup();
+
+        radio_mode[MODE_BITS].setText("Boolean");//parte bits /boolean
+        radio_mode[MODE_INTEGERS].setText("Integers");//parte int
+        radio_mode[MODE_FLOATS].setText("Doubles");//parte double / float
+        for (int i = 0; i < 3; i++) {
+            radio_mode[i].setIndex(i);
+            radio_mode[i].setFont(RADIO_FONT);
+            radio_mode[i].setForeground(DEFAULT_FORECOLOR);
+            radio_mode[i].setBackground(BACKCOLOR);
+            radio_mode[i].setHorizontalAlignment(JLabel.LEFT);
+            
+            group_radio.add(radio_mode[i]);
+        }
+
+        for (int i = 0; i < 64; i++) {
+
+            setFixedSize(label_inputTitle[i], TITLEIO_WIDTH, TITLEIO_HEIGHT);
+            label_inputTitle[i].setIndex(i);
+            label_inputTitle[i].setFont(DEFAULT_FONT);
+            label_inputTitle[i].setForeground(DEFAULT_FORECOLOR);
+            label_inputTitle[i].setHorizontalAlignment(JLabel.LEFT);
+            label_inputTitle[i].setVisible(false);
+
+            setFixedSize(label_outputTitle[i], TITLEIO_WIDTH, TITLEIO_HEIGHT);
+            label_outputTitle[i].setIndex(i);
+            label_outputTitle[i].setFont(DEFAULT_FONT);
+            label_outputTitle[i].setForeground(DEFAULT_FORECOLOR);
+            label_outputTitle[i].setHorizontalAlignment(JLabel.LEFT);
+            label_outputTitle[i].setVisible(false);
+
+            setFixedSize(label_inputValue[i], VALUEIO_WIDTH, VALUEIO_HEIGHT);
+            label_inputValue[i].setIndex(i);
+            label_inputValue[i].setFont(DEFAULT_FONT);
+            label_inputValue[i].setForeground(DEFAULT_FORECOLOR);
+            label_inputValue[i].setHorizontalAlignment(JLabel.LEFT);
+            label_inputValue[i].setVisible(false);
+
+            setFixedSize(label_outputValue[i], VALUEIO_WIDTH, VALUEIO_HEIGHT);
+            label_outputValue[i].setIndex(i);
+            label_outputValue[i].setFont(DEFAULT_FONT);
+            label_outputValue[i].setForeground(DEFAULT_FORECOLOR);
+            label_outputValue[i].setHorizontalAlignment(JLabel.LEFT);
+            label_outputValue[i].setVisible(false);
+            
+        }
+
+        buttcsv.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        buttcsv.setMaximumSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        buttcsv.setAlignmentX(Component.CENTER_ALIGNMENT);//modificato
+        buttcsv.setFont(BUTTON_FONT);
+        
+        
+        buttvnc.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        buttvnc.setMaximumSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        buttvnc.setAlignmentX(Component.RIGHT_ALIGNMENT);//modificato
+        buttvnc.setFont(BUTTON_FONT);
+        
+        //scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        //scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        scrollPane.setBounds(100,100, 50,100);  
+        
+
+        btn_hide.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        btn_hide.setMaximumSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        btn_hide.setAlignmentX(Component.RIGHT_ALIGNMENT);//modificato
+        btn_hide.setFont(BUTTON_FONT);
+        
+        
+
+        /* mettere in una scatola*/
+        box_title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        box_title.add(setHorizonalSpace(LEFT_PADDING));
+        box_title.add(imageLabel,BorderLayout.CENTER);
+        box_title.add(label_title);
+        box_title.add(btn_hide);
+        box_title.add(buttcsv);
+        box_title.add(buttvnc);        
+        
+        
+        box_radios.setAlignmentX(Component.LEFT_ALIGNMENT);
+        box_radios.add(setHorizonalSpace(LEFT_PADDING));
+        box_radios.add(radio_mode[MODE_BITS]);
+        box_radios.add(setHorizonalSpace(LEFT_PADDING));
+        box_radios.add(radio_mode[MODE_INTEGERS]);
+        box_radios.add(setHorizonalSpace(LEFT_PADDING));
+        box_radios.add(radio_mode[MODE_FLOATS]);
+        
+
+
+     
+    	 //fa vedere tutti e tre i tipi
+           
+    	   for (int i = 0; i < ArraySize; i++) {
+               
+    		   
+              	box_iovalue[i].setAlignmentX(Component.LEFT_ALIGNMENT);
+              	//box_iovalue[i].add(setHorizonalSpace(60));
+                  box_iovalue[i].add(label_inputTitle[i]);
+                  //box_iovalue[i].add(setHorizonalSpace(-50));
+                  box_iovalue[i].add(label_inputValue[i]);
+                  box_iovalue[i].setAlignmentX(Component.LEFT_ALIGNMENT);
+                  //box_iovalue[i].add(setHorizonalSpace(60));
+                  box_iovalue[i].add(label_outputTitle[i]);
+                  //box_iovalue[i].add(setHorizonalSpace(-50));
+                  box_iovalue[i].add(label_outputValue[i]);
+                  box_iovalue[i].setAlignmentX(Component.LEFT_ALIGNMENT);
+                  //box_iovalue[i].add(setHorizonalSpace(60));
+                  box_iovalue[i].add(label_inputTitle[ArraySize + i]);
+                  //box_iovalue[i].add(setHorizonalSpace(-50));
+                  box_iovalue[i].add(label_inputValue[ArraySize + i]);
+                  box_iovalue[i].setAlignmentX(Component.LEFT_ALIGNMENT);
+                  //box_iovalue[i].add(setHorizonalSpace(60));
+                  box_iovalue[i].add(label_outputTitle[ArraySize + i]);
+                  box_iovalue[i].add(setHorizonalSpace(-50));
+                  box_iovalue[i].add(label_outputValue[ArraySize + i]);
+                  
+       }
+    	  
+    	
+    	 
+   
+        
+
+        /* Posizionamento sul modulo*/
+        panel.add(setVerticalSpace(5));
+        panel.add(box_title);
+        panel.add(setVerticalSpace(5));
+        panel.add(box_radios);
+
+        panel.add(setVerticalSpace(5));
+        
+        for (int i = 0; i < 32; i++) {
+            panel.add(box_iovalue[i]);
+        }
+     // Aggiungi la tabella a quattro colonne
+        JPanel tablePanel = createTablePLC();
+        JPanel tableRDE = createTableRTDE();
+        panel.add(tablePanel);
+        panel.add(tableRDE);
+        this.add(panel);
+        
+
+    }
+    private JPanel createTablePLC() {
+        JPanel tablePanel = new JPanel();
+        //aggiunge alla colonna 4 colonne
+        tablePanel.setLayout(new GridLayout(0, 4));
+        
+        //serve per rendere la parola in grassetto
+        JLabel label = new JLabel("FieldBus/PLC");
+        Font boldFont = new Font(label.getFont().getFontName(), Font.BOLD, label.getFont().getSize());
+        label.setForeground(Color.RED);
+        label.setFont(boldFont);
+        
+        
+        tablePanel.add(new JLabel(""));;
+        tablePanel.add(new JLabel(""));
+        tablePanel.add(label);
+        tablePanel.add(new JLabel(""));
+        
+        tablePanel.setLayout(new GridLayout(0, 4)); // 4 colonne
+        // Aggiungi titoli delle colonne
+        tablePanel.add(new JLabel("Input Title"));
+        tablePanel.add(new JLabel("Input Value"));
+        tablePanel.add(new JLabel("Output Title"));
+        tablePanel.add(new JLabel("Output Value"));
+        // Aggiungi dati delle colonne (assumendo che tu abbia array di input e output)
+        for (int i = 0; i < 24; i++) {
+            tablePanel.add(label_inputTitle[i]);
+            tablePanel.add(label_inputValue[i]);
+            tablePanel.add(label_outputTitle[i]);
+            tablePanel.add(label_outputValue[i]);
+        }
+
+     // Aggiungi il pannello della tabella a uno JScrollPane
+       JScrollPane scrollPane = new JScrollPane(tablePanel);
+        // Imposta il layout del contenitore esterno (ad es. JFrame) a BorderLayout
+        // e aggiungi il JScrollPane al centro per farlo riempire tutto lo spazio disponibile
+        JPanel containerPanel = new JPanel(new BorderLayout());
+        containerPanel.add(scrollPane);
+        return containerPanel;
+    }
+    private JPanel createTableRTDE() {
+        JPanel tablePanel = new JPanel();
+        tablePanel.setLayout(new GridLayout(0, 4));
+        JLabel label2 = new JLabel("RTDE");
+        Font boldFont2 = new Font(label2.getFont().getFontName(), Font.BOLD, label2.getFont().getSize());
+        label2.setForeground(Color.RED);
+        label2.setFont(boldFont2);
+        
+        tablePanel.add(new JLabel(""));
+        tablePanel.add(new JLabel(""));
+        tablePanel.add(label2);
+        tablePanel.add(new JLabel(""));;
+        
+        
+        tablePanel.setLayout(new GridLayout(0, 4)); // 4 colonne
+        tablePanel.add(new JLabel("Input Title"));
+        tablePanel.add(new JLabel("Input Value"));
+        tablePanel.add(new JLabel("Output Title"));
+        tablePanel.add(new JLabel("Output Value"));
+        // Aggiungi dati delle colonne (assumendo che tu abbia array di input e output)
+        for (int i = 24; i < 48; i++) {
+            tablePanel.add(label_inputTitle[i]);
+            tablePanel.add(label_inputValue[i]);
+            tablePanel.add(label_outputTitle[i]);
+            tablePanel.add(label_outputValue[i]);
+        }
+     // Aggiungi il pannello della tabella a uno JScrollPane
+       JScrollPane scrollPane = new JScrollPane(tablePanel);
+        // Imposta il layout del contenitore esterno (ad es. JFrame) a BorderLayout
+        // e aggiungi il JScrollPane al centro per farlo riempire tutto lo spazio disponibile
+        JPanel containerPanel = new JPanel(new BorderLayout());
+        containerPanel.add(scrollPane);
+        return containerPanel;
+    }
+
+    /**
+     * Definizione di ogni gestore di eventi
+     */
+    private void setEventHandlers() {
+
+        // Gestore di eventi
+        btn_hide.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent mouseEvent) {
+                if (!((JButton) mouseEvent.getSource()).isEnabled())
+                    return;
+                disposeAllRTDEThreads();
+                clearFormTexts();
+                getFrame(mouseEvent).setVisible(false);
+
+            }
+
+        });
+
+        buttcsv.addActionListener(new ActionListener() 
+        {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				
+				 JFileChooser fileChooser = new JFileChooser();
+	                fileChooser.setFileFilter(new FileNameExtensionFilter("File CSV (*.csv)", "csv"));
+
+	                int returnValue = fileChooser.showOpenDialog(null);
+	                if (returnValue == JFileChooser.APPROVE_OPTION) {
+	                	selectedFile = fileChooser.getSelectedFile();
+	                    loadCsvFile(selectedFile);
+	                    
+	                }
+				
+			}
+			
+			private void loadCsvFile(File selectedFile) {
+				try {
+	                BufferedReader reader = new BufferedReader(new FileReader(selectedFile));
+	                String line;
+	                while ((line = reader.readLine()) != null) {
+	                    // Elaborazione delle righe del file CSV
+	                    System.out.println(line);
+	                    //JOptionPane.showMessageDialog(null,"CARICATO");
+	                    
+	                }
+	                reader.close();
+	            } catch (Exception e) {
+	                e.printStackTrace();
+	            }
+			}
+        	
+        });
+        
+        buttvnc.addActionListener(new ActionListener()
+        {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) 
+			{
+				selectAndExecuteScript();
+            }
+			
+			
+        	
+        });
+        
+        
+        //panel.add(buttcsv);
+
+      /*  private static void loadCsvFile(File file) 
+        {
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // Elaborazione delle righe del file CSV
+                    System.out.println(line);
+                }
+                reader.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }*/
+        
+
+        // gestore di eventi del pulsante di opzione
+        for (int i = 0; i < 3; i++) {
+            radio_mode[i].addChangeListener(new ChangeListener() {
+
+                @Override
+                public void stateChanged(ChangeEvent e) {
+                    IdxRadioButton radioBtn = (IdxRadioButton) e.getSource();
+                    int mode = radioBtn.getIndex();
+
+                    if (!radioBtn.isSelected())
+                        return;
+
+                    if (mode == MODE_BITS && rtdeClientOfBitRegister != null)
+                    	return;
+                    
+                        
+                    if (mode == MODE_INTEGERS && rtdeClientOfIntegerRegister != null)
+                    	return;
+                    
+                        
+                    if (mode == MODE_FLOATS && rtdeClientOfDoubleRegister != null) 
+                    	return;
+                        
+
+                    disposeAllRTDEThreads();
+                    startRTDEClient(mode);
+                }
+            });
+        }
+
+        // Esegue il gestore eventi per l'etichetta solo in modalità bit
+        for (int i = 0; i < 48; i++) {
+            label_outputTitle[i].addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent mouseEvent) {
+
+                    int index = ((IdxLabel) mouseEvent.getSource()).getIndex();
+                   
+                    int mode = 0;
+                    for (int i = 0; i < 3; i++) {
+                        if (radio_mode[i].isSelected()) {
+                            mode = i;
+                            break;
+                        }
+                    }
+
+                    if ((mode == MODE_BITS) && (rtdeClientOfBitRegister != null)) {
+                        RealTimeClient realTimeClient = new RealTimeClient("127.0.0.1");
+                        
+
+                        if (label_outputValue[index].getText().equals("ON")) 
+                            realTimeClient.setBitToRegister(index, false);
+                        else
+                            realTimeClient.setBitToRegister(index, true);
+                    }
+                    
+                    if((mode == MODE_INTEGERS) && (rtdeClientOfIntegerRegister != null)) {
+                    	final RealTimeClient realTimeClient = new RealTimeClient("127.0.0.1");
+                    	
+                    	if("0".equals(label_outputValue[index].getText()) && label_outputValue[index].isVisible()) {
+                    		
+                    		
+                    		JDialog dialog = new JDialog();
+                            JPanel panello = new JPanel();
+                            
+                            panello.setPreferredSize(new Dimension(300, 200));
+                            JLabel promptLabel = new JLabel("Nuovo Valore:");
+                            JTextField textField = new JTextField(10);
+                            JButton okButton = new JButton("OK");
+                            okButton.addActionListener(e ->
+                            {
+                            	String newValue = textField.getText();
+                            	realTimeClient.setIntToRegister(index, Integer.parseInt(newValue));
+                            	 
+                            	
+                            	//label_outputValue[index].setText(newValue);
+                            	dialog.dispose();
+                            	
+                            	
+                            });
+                            
+                            panello.add(promptLabel);
+                            panello.add(textField);
+                            panello.add(okButton);
+                            addVirtualKeyboard(textField);
+                            dialog.add(panello);
+                            dialog.pack();
+                            dialog.setVisible(true);
+                    	}
+                    	else if(!"0".equals(label_outputValue[index].getText()) && label_outputValue[index].isVisible()) {
+                    		JDialog dialog = new JDialog();
+                            JPanel panello = new JPanel();
+                            panello.setPreferredSize(new Dimension(300, 200));
+                            JLabel promptLabel = new JLabel("Nuovo Valore:");
+                            JTextField textField = new JTextField(10);
+                            JButton okButton = new JButton("OK");
+                            okButton.addActionListener(e ->
+                            {
+                            	String newValue = textField.getText();
+                            	realTimeClient.setIntToRegister(index, Integer.parseInt(newValue));
+                            	 
+                            	
+                            	//label_outputValue[index].setText(newValue);
+                            	dialog.dispose();
+                            	
+                            	
+                            });
+                            
+                            panello.add(promptLabel);
+                            panello.add(textField);
+                            panello.add(okButton);
+                            addVirtualKeyboard(textField);
+                            dialog.add(panello);
+                            dialog.pack();
+                            dialog.setVisible(true);
+                    	}
+                    	
+                    }
+                    if((mode == MODE_FLOATS) && (rtdeClientOfDoubleRegister != null)) 
+                    {
+                    	RealTimeClient realTimeClient = new RealTimeClient("127.0.0.1");
+                    	
+                    	if("0.000".equals(label_outputValue[index].getText()) && label_outputValue[index].isVisible()) {
+                    		JDialog dialog = new JDialog();
+                            JPanel panello = new JPanel();
+                            panello.setPreferredSize(new Dimension(300, 200));
+                            JLabel promptLabel = new JLabel("Nuovo Valore:");
+                            JTextField textField = new JTextField(10);
+                            JButton okButton = new JButton("OK");
+                            okButton.addActionListener(e ->
+                            {
+                            	String newValue = textField.getText();
+                            	realTimeClient.setFloatToRegister(index, Float.parseFloat(newValue));
+                            	 
+                            	
+                            	//label_outputValue[index].setText(newValue);
+                            	dialog.dispose();
+                            	
+                            	
+                            });
+                            panello.add(promptLabel);
+                            panello.add(textField);
+                            panello.add(okButton);
+                            addVirtualKeyboard(textField);
+                            dialog.add(panello);
+                            dialog.pack();
+                            dialog.setVisible(true);
+                    	}
+                    	else if(!"0.000".equals(label_outputValue[index].getText()) && label_outputValue[index].isVisible()) {
+                    		JDialog dialog = new JDialog();
+                            JPanel panello = new JPanel();
+                            panello.setPreferredSize(new Dimension(300, 200));
+                            JLabel promptLabel = new JLabel("Nuovo Valore:");
+                            JTextField textField = new JTextField(10);
+                            JButton okButton = new JButton("OK");
+                            okButton.addActionListener(e ->
+                            {
+                            	String newValue = textField.getText();
+                            	realTimeClient.setFloatToRegister(index, Float.parseFloat(newValue));
+                            	 
+                            	
+                            	//label_outputValue[index].setText(newValue);
+                            	dialog.dispose();
+                            	
+                            	
+                            });
+                            panello.add(promptLabel);
+                            panello.add(textField);
+                            panello.add(okButton);
+                            addVirtualKeyboard(textField);
+                            dialog.add(panello);
+                            dialog.pack();
+                            dialog.setVisible(true);
+                    	}
+                    }
+                }
+            });
+        }
+
+    }
+    private void eseguiScriptShell() {
+    	if (selectedScriptFile == null) {
+            JOptionPane.showMessageDialog(this, "Seleziona prima un file di script.", "Errore", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            // Concedi i permessi di esecuzione al file selezionato
+            if (selectedScriptFile.setExecutable(true)) {
+                // Esegui lo script shell direttamente
+                Process process = new ProcessBuilder(selectedScriptFile.getAbsolutePath()).start();
+                int exitCode = process.waitFor();
+
+                // Gestisci l'output del processo (se necessario)
+                BufferedReader processOutputReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String outputLine;
+                while ((outputLine = processOutputReader.readLine()) != null) {
+                    System.out.println(outputLine);
+                }
+
+                if (exitCode == 0) {
+                    JOptionPane.showMessageDialog(this, "Lo script è stato eseguito con successo.", "Esecuzione completata", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Errore durante l'esecuzione dello script.", "Errore", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Impossibile concedere i permessi di esecuzione al file selezionato.", "Errore", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Errore durante l'esecuzione dello script.", "Errore", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    private void selectAndExecuteScript() {
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            selectedScriptFile = fileChooser.getSelectedFile();
+            if (selectedScriptFile.getName().endsWith(".sh")) {
+            	eseguiScriptShell();
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleziona un file con estensione .sh", "Errore", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    private void addVirtualKeyboard(JTextField textField) {
+        JPanel keyboardPanel = new JPanel();
+        keyboardPanel.setLayout(new GridLayout(4, 3));
+     // Aggiungi i pulsanti numerici da 0 a 9
+        for (int i = 0; i <= 9; i++) {
+            JButton button = new JButton(Integer.toString(i));
+            button.addActionListener(e -> {
+                String currentValue = textField.getText();
+                textField.setText(currentValue + button.getText());
+            });
+            keyboardPanel.add(button);
+        }
+     // Aggiungi il pulsante del punto decimale
+        JButton dotButton = new JButton(".");
+        dotButton.addActionListener(e -> {
+            String currentValue = textField.getText();
+            if (!currentValue.contains(".")) {
+                textField.setText(currentValue + ".");
+            }
+        });
+        keyboardPanel.add(dotButton);
+        
+        JButton deleteButton = new JButton("Del");
+        deleteButton.addActionListener(e -> {
+            String currentValue = textField.getText();
+            if (currentValue.length() > 0) {
+                textField.setText(currentValue.substring(0, currentValue.length() - 1));
+            }
+        });
+        keyboardPanel.add(deleteButton);
+        JPanel panello = (JPanel) textField.getParent();
+        panello.add(keyboardPanel);
+    }
+    /**
+     * Genera un array di RadioButtons
+     * 
+     * @param count numero
+     * @return matrice di oggetti
+     */
+    private IdxRadioButton[] createRadioButtonArray(int count) {
+        ArrayList<IdxRadioButton> comp_list = new ArrayList<IdxRadioButton>();
+
+        for (int i = 0; i < count; i++) {
+            comp_list.add(new IdxRadioButton());
+        }
+
+        return comp_list.toArray(new IdxRadioButton[] {});
+    }
+
+    /**
+     * Genera array di oggetti di JLabel
+     * 
+     * @param count numero
+     * @return matrice di oggetti
+     */
+    private IdxLabel[] createLabelArray(int count) {
+        ArrayList<IdxLabel> comp_list = new ArrayList<IdxLabel>();
+
+        for (int i = 0; i < count; i++) {
+            comp_list.add(new IdxLabel());
+        }
+
+        return comp_list.toArray(new IdxLabel[] {});
+    }
+
+    /**
+     * Visualizza i bit da 0 a 31 GP_Input.
+     * 
+     * @param valueIO numero memorizzato in bit
+     * @param reload  Se aggiornare o meno la visualizzazione del frame
+     */
+    public void setInputValueLower(int valueIO, boolean reload) {
+
+        if (reload) {
+            boolean[] newValues = TypeConverter.intToBits(valueIO);
+            boolean[] prevValues = TypeConverter.intToBits(prev_input_0to31);
+
+            for (int i = 0; i < 32; i++) {
+                if (newValues[i] != prevValues[i]) {
+
+                    Color forecolor = isDefinedInputBits[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                    label_inputTitle[i].setForeground(newValues[i] ? ON_COLOR : forecolor);
+
+                    label_inputValue[i].setText(newValues[i] ? "ON" : "-");
+                    label_inputValue[i].setForeground(newValues[i] ? ON_COLOR : forecolor);
+                }
+            }
+        } else {
+            boolean[] values = TypeConverter.intToBits(valueIO);
+
+            for (int i = 0; i < 32; i++) {
+                Color forecolor = isDefinedInputBits[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                label_inputTitle[i].setForeground(values[i] ? ON_COLOR : forecolor);
+
+                label_inputValue[i].setText(values[i] ? "ON" : "-");
+                label_inputValue[i].setForeground(values[i] ? ON_COLOR : forecolor);
+            }
+        }
+
+        prev_input_0to31 = valueIO;
+    }
+
+    /**
+     * Mostra i bit 32-63 di GP_Input.
+     * 
+     * @param valueIO numero memorizzato in bit
+     * @param reload  Se aggiornare o meno la visualizzazione del frame
+     */
+    public void setInputValueUpper(int valueIO, boolean reload) {
+
+        if (reload) {
+            boolean[] newValues = TypeConverter.intToBits(valueIO);
+            boolean[] prevValues = TypeConverter.intToBits(prev_input_32to63);
+
+            for (int i = 0; i < 32; i++) {
+                if (newValues[i] != prevValues[i]) {
+                    Color forecolor = isDefinedInputBits[i + 32] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                    label_inputTitle[i + 32].setForeground(newValues[i] ? ON_COLOR : forecolor);
+
+                    label_inputValue[i + 32].setText(newValues[i] ? "ON" : "-");
+                    label_inputValue[i + 32].setForeground(newValues[i] ? ON_COLOR : forecolor);
+                }
+            }
+        } else {
+
+            boolean[] values = TypeConverter.intToBits(valueIO);
+
+            for (int i = 0; i < 32; i++) {
+                Color forecolor = isDefinedInputBits[i + 32] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                label_inputTitle[i + 32].setForeground(values[i] ? ON_COLOR : forecolor);
+
+                label_inputValue[i + 32].setText(values[i] ? "ON" : "-");
+                label_inputValue[i + 32].setForeground(values[i] ? ON_COLOR : forecolor);
+            }
+        }
+
+        prev_input_32to63 = valueIO;
+    }
+
+    /**
+     * Visualizza i bit da 0 a 31 GP_Output.
+     * 
+     * @param valueIO numero memorizzato in bit
+     * @param reload  Se aggiornare o meno la visualizzazione del frame
+     */
+    public void setOutputValueLower(int valueIO, boolean reload) {
+
+        if (reload) {
+            boolean[] newValues = TypeConverter.intToBits(valueIO);
+            boolean[] prevValues = TypeConverter.intToBits(prev_output_0to31);
+
+            for (int i = 0; i < 32; i++) {
+                if (newValues[i] != prevValues[i]) {
+                    Color forecolor = isDefinedOutputBits[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                    label_outputTitle[i].setForeground(newValues[i] ? ON_COLOR : forecolor);
+
+                    label_outputValue[i].setText(newValues[i] ? "ON" : "-");
+                    label_outputValue[i].setForeground(newValues[i] ? ON_COLOR : forecolor);
+                }
+            }
+        } else {
+            boolean[] values = TypeConverter.intToBits(valueIO);
+
+            for (int i = 0; i < 32; i++) {
+                Color forecolor = isDefinedOutputBits[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                label_outputTitle[i].setForeground(values[i] ? ON_COLOR : forecolor);
+
+                label_outputValue[i].setText(values[i] ? "ON" : "-");
+                label_outputValue[i].setForeground(values[i] ? ON_COLOR : forecolor);
+            }
+        }
+
+        prev_output_0to31 = valueIO;
+    }
+
+    /**
+     * Visualizza i bit GP_Output dal 32° al 63°.
+     * 
+     * @param valueIO numero memorizzato in bit
+     * @param reload  Se aggiornare o meno la visualizzazione del frame
+     */
+    public void setOutputValueUpper(int valueIO, boolean reload) {
+        if (reload) {
+            boolean[] newValues = TypeConverter.intToBits(valueIO);
+            boolean[] prevValues = TypeConverter.intToBits(prev_output_32to63);
+
+            for (int i = 0; i < 32; i++) {
+                if (newValues[i] != prevValues[i]) {
+                    Color forecolor = isDefinedOutputBits[i + 32] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                    label_outputTitle[i + 32].setForeground(newValues[i] ? ON_COLOR : forecolor);
+
+                    label_outputValue[i + 32].setText(newValues[i] ? "ON" : "-");
+                    label_outputValue[i + 32].setForeground(newValues[i] ? ON_COLOR : forecolor);
+                }
+            }
+        } else {
+
+            boolean[] values = TypeConverter.intToBits(valueIO);
+
+            for (int i = 0; i < 32; i++) {
+                Color forecolor = isDefinedOutputBits[i + 32] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                label_outputTitle[i + 32].setForeground(values[i] ? ON_COLOR : forecolor);
+
+                label_outputValue[i + 32].setText(values[i] ? "ON" : "-");
+                label_outputValue[i + 32].setForeground(values[i] ? ON_COLOR : forecolor);
+            }
+        }
+
+        prev_output_32to63 = valueIO;
+
+    }
+
+    /**
+     * コンポーネントのサイズを設定
+     * 
+     * @param comp   componente
+     * @param width  larghezza
+     * @param height alteza
+     */
+    private void setFixedSize(Component comp, int width, int height) {
+
+        comp.setPreferredSize(new Dimension(width, height));
+        comp.setMinimumSize(new Dimension(width, height));
+        comp.setMaximumSize(new Dimension(width, height));
+    }
+
+    /**
+     * Riflette il nome sull'etichetta I/O. Se non è impostato alcun nome, verrà visualizzato il nome predefinito.
+     */
+    
+    
+    public void setTextOfIOLabels(int mode) {
+
+        URCapAPI api = contribution.api;
+
+        // Nascondi tutte le etichette
+       /* for (int i = 0; i < 64; i++) {
+            label_inputTitle[i].setVisible(false);
+            label_inputValue[i].setVisible(false);
+            label_outputValue[i].setVisible(false);
+            label_outputValue[i].setVisible(false);
+        }*/
+       for (int i = 0; i < 64; i++) {
+            label_inputTitle[i].setText("");
+            label_inputValue[i].setText("");
+            label_outputTitle[i].setText("");
+            label_outputValue[i].setText("");
+        }
+       File path = IOMonitorFrame.GetFileRead();
+       switch (mode) { 
+       case MODE_BITS:  	   
+       	String csvPercorso = path.getPath();//"/home/ur/ursim/ursim-5.11.0.108249/programs.UR5/Prova.csv";
+           String linee = "";
+           String csvSplit = ",";
+           int f=0;
+           int inp=0;
+           int outp=0;
+           int inPLCbit=0;
+           int inRTDEbit=24;
+           int outPLCbit =0;
+           int outRTDEbit = 24;
+           
+       	for(int j= 0;j<48;j++) {
+       		isDefinedInputBits[j] = false;
+               isDefinedOutputBits[j] = false;
+       	}
+           try (BufferedReader br = new BufferedReader(new FileReader(csvPercorso))) {
+               // Salta la riga dell'intestazione
+               br.readLine();
+
+               while ((linee = br.readLine()) != null && f < 96) {
+                   String[] data = linee.split(csvSplit);
+
+                   // Assuming the columns are in order: Titolo, Tipo, Visibilità
+                   String titolo = data[0];
+                   String tipo = data[1];
+                   String visibilita = data[2];
+
+                   if(tipo.equals("bit") && visibilita.equals("FALSE")&& f<48){
+                   	//label_inputValue[f].setVisible(false);
+                   	f++;
+                   	
+                   }else if(tipo.equals("bit") && visibilita.equals("FALSE")&&f>47) {
+                   	//label_outputValue[f-48].setVisible(false);
+                   	f++;
+                   }// input
+                   else  if (tipo.equals("bit") && visibilita.equals("TRUE")&&f<48) {
+                	   if(f<=23) {
+                    	   inp=inPLCbit;
+                    	   inPLCbit++;
+                       }
+                       else {
+                    	   inp=inRTDEbit;
+                    	   inRTDEbit++;
+                       }
+                   	   label_inputTitle[inp].setText("Input" + String.valueOf(f));
+                       label_inputValue[inp].setVisible(true);
+                       isDefinedInputIntegers[inp] = true;
+                       //JOptionPane.showMessageDialog(null, "posizione: " + i + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                      
+                       f++;
+                      
+                       //output
+                   }else if(tipo.equals("bit") && visibilita.equals("TRUE")&&f>47) {
+                	   if(f<72) {
+                    	   outp=outPLCbit;
+                    	   outPLCbit++;
+                       }
+                       else {
+                    	   outp=outRTDEbit;
+                    	   outRTDEbit++;
+                       }
+                   	label_outputTitle[outp].setText("Output" + String.valueOf(f-48));
+                   	label_outputValue[outp].setVisible(true);
+                   	 isDefinedOutputIntegers[outp] = true;
+                   	 //JOptionPane.showMessageDialog(null, "posizione: " + i + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                   	
+                   	 f++;
+                     
+                   	
+                   }
+               }
+           } catch (IOException e) {
+               e.printStackTrace();
+           }
+
+           // Riflettere il nome dell'IO.
+           Collection<BooleanRegister> bitIOs = api.getInstallationAPIProvider().getInstallationAPI().getIOModel()
+                   .getIOs(BooleanRegister.class);
+
+           for (BooleanRegister io : bitIOs) {
+               String defname = io.getDefaultName();
+               String ioname = io.getName();
+
+               if (defname.indexOf("GP_bool_in") != -1) {
+                   int index = Integer.valueOf(defname.replace("GP_bool_in[", "").replace("]", ""));
+                   if (index < 48) {
+                       isDefinedInputBits[index] = true;
+                       label_inputTitle[index].setText(ioname);
+                   }
+
+               } else if (defname.indexOf("GP_bool_out") != -1) {
+                   int index = Integer.valueOf(defname.replace("GP_bool_out[", "").replace("]", ""));
+                   if (index < 48) {
+                       isDefinedOutputBits[index] = true;
+                       label_outputTitle[index].setText(ioname);
+                   }
+
+               }
+
+           }
+
+           break;
+
+       case MODE_INTEGERS:
+           String csvFile = path.getPath();//"/home/ur/ursim/ursim-5.11.0.108249/programs.UR5/Prova.csv";
+           String line = "";
+           String csvSplitBy = ",";
+           int i = 0;
+           int inpint=0;
+           int outpint=0;
+           int inPLCint=0;
+           int inRTDEint=24;
+           int outPLCint =0;
+           int outRTDEint = 24;
+           // Resetta le variabili booleane a false
+           for (int j = 0; j < 48; j++) {
+               isDefinedInputIntegers[j] = false;
+               isDefinedOutputIntegers[j] = false;
+           }
+
+           try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+               // Salta la riga dell'intestazione
+               br.readLine();
+
+               while ((line = br.readLine()) != null && i < 96) {
+                   String[] data = line.split(csvSplitBy);
+
+                   // Assuming the columns are in order: Titolo, Tipo, Visibilità
+                   String titolo = data[0];
+                   String tipo = data[1];
+                   String visibilita = data[2];
+
+                   if(tipo.equals("int") && visibilita.equals("FALSE")&& i<48){
+                   	label_inputValue[i].setVisible(false);
+                   	i++;
+                   	
+                   }else if(tipo.equals("int") && visibilita.equals("FALSE")&&i>47) {
+                   	label_outputValue[i-48].setVisible(false);
+                   	i++;
+                   }// input
+                   else  if (tipo.equals("int") && visibilita.equals("TRUE")&&i<48) {
+                	   if(i<=23) {
+                    	   inpint=inPLCint;
+                    	   inPLCint++;
+                       }
+                       else {
+                    	   inpint=inRTDEint;
+                    	   inRTDEint++;
+                       }
+                	   
+                	   
+                	   label_inputTitle[inpint].setText("In_Int" + String.valueOf(i));
+                       label_inputValue[inpint].setVisible(true);
+                       isDefinedInputIntegers[inpint] = true;
+                       //JOptionPane.showMessageDialog(null, "posizione: " + i + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                       i++;
+                       
+                       //output
+                   }else if(tipo.equals("int") && visibilita.equals("TRUE")&&i>47) {
+                	   if(i<72) {
+                    	   outpint=outPLCint;
+                    	   outPLCint++;
+                       }
+                       else {
+                    	   outpint=outRTDEint;
+                    	   outRTDEint++;
+                       }
+                	   
+                	   
+                   	label_outputTitle[outpint].setText("Out_Int" + String.valueOf(i-48));
+                   	label_outputValue[outpint].setVisible(true);
+                   	 isDefinedOutputIntegers[outpint] = true;
+                   	 //JOptionPane.showMessageDialog(null, "posizione: " + i + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                   	 i++;
+                   	
+                   }
+               }
+           } catch (IOException e) {
+               e.printStackTrace();
+           }
+
+           // Rifletti il ​​nome di IO.
+           Collection<IntegerRegister> intIOs = api.getInstallationAPIProvider().getInstallationAPI().getIOModel()
+                   .getIOs(IntegerRegister.class);
+
+           for (IntegerRegister io : intIOs) {
+               String defname = io.getDefaultName();
+               String ioname = io.getName();
+
+               // Controlla se la stringa "defname" contiene la sottostringa "GP_int_in"
+               if (defname.contains("GP_int_in")) {
+                   int index = Integer.parseInt(defname.substring(defname.indexOf("[") + 1, defname.indexOf("]")));
+                   if (index < 48 && isDefinedInputIntegers[index]) {
+                       label_inputTitle[index].setText(ioname);
+                   }
+               } else if (defname.contains("GP_int_out")) {
+                   int index = Integer.parseInt(defname.substring(defname.indexOf("[") + 1, defname.indexOf("]")));
+                   if (index <48 && isDefinedOutputIntegers[index]) {
+                       label_outputTitle[index].setText(ioname);
+                   }
+               }
+           }
+
+           break;
+
+
+       case MODE_FLOATS:
+       	
+
+           // Resetta le variabili booleane a false
+           for (int m = 0; m< 48; m++) {
+               isDefinedInputFloats[m] = false;
+               isDefinedOutputFloats[m] = false;
+           }
+           String csvPath = path.getPath();//"/home/ur/ursim/ursim-5.11.0.108249/programs.UR5/Prova.csv";
+           String linea = "";
+           String csvSplitWith = ",";
+           int z = 0;
+           int inpfloat=0;
+           int outfloat=0;
+           int inPLCfloat=0;
+           int inRTDEfloat=24;
+           int outPLCfloat =0;
+           int outRTDEfloat = 24;
+           try (BufferedReader br = new BufferedReader(new FileReader(csvPath))) {
+               // Salta la riga dell'intestazione
+               br.readLine();
+
+               while ((linea = br.readLine()) != null && z < 96) {
+                   String[] data = linea.split(csvSplitWith);
+
+                   // Assuming the columns are in order: Titolo, Tipo, Visibilità
+                   String titolo = data[0];
+                   String tipo = data[1];
+                   String visibilita = data[2];
+                   
+                   if(tipo.equals("double") && visibilita.equals("FALSE")&&z<48){
+                   	label_inputValue[z].setVisible(false);
+                   	
+                   	z++;
+                   }else if(tipo.equals("double") && visibilita.equals("FALSE")&&z>47) {
+                   	//label_outputValue[z-47].setVisible(false);
+                   	z++;
+                   }
+                   //Input
+                    else if (tipo.equals("double") && visibilita.equals("TRUE")&&z<48) {
+                    	
+                    	if(z<=23) {
+                     	   inpfloat=inPLCfloat;
+                     	   inPLCfloat++;
+                        }
+                        else {
+                     	   inpfloat=inRTDEfloat;
+                     	   inRTDEfloat++;
+                        }
+                 	   
+                   	label_inputTitle[inpfloat].setText("In_Float" + String.valueOf(z));
+                   	label_inputValue[inpfloat].setVisible(true);
+                   	isDefinedInputFloats[inpfloat] = true;
+                       //JOptionPane.showMessageDialog(null, "posizione: " + z + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                       z++;
+                      
+                     //output
+                   }else if(tipo.equals("double") && visibilita.equals("TRUE")&&z>47) {
+                	   
+                	   if(z<72) {
+                		   outfloat=outPLCfloat;
+                    	   outPLCfloat++;
+                       }
+                       else {
+                    	   outfloat=outRTDEfloat;
+                    	   outRTDEfloat++;
+                       }
+                	   
+                   	label_outputTitle[outfloat].setText("Out_Float" + String.valueOf(z-48));
+                   	label_outputValue[outfloat].setVisible(true);
+                   	isDefinedOutputFloats[outfloat] = true;
+                   	//JOptionPane.showMessageDialog(null, "posizione: " + z + " titolo: " +titolo + " visibilità: "+ visibilita  );
+                   	 z++;
+                   	
+                   }
+
+               }
+           } catch (IOException e) {
+               e.printStackTrace();
+           }
+
+           // Rifletti il ​​nome di IO.
+           Collection<FloatRegister> floatIOs = api.getInstallationAPIProvider().getInstallationAPI().getIOModel()
+                   .getIOs(FloatRegister.class);
+
+           for (FloatRegister io : floatIOs) {
+               String defname = io.getDefaultName();
+               String ioname = io.getName();
+
+               if (defname.indexOf("GP_float_in") != -1) {
+                   int index = Integer.valueOf(defname.replace("GP_float_in[", "").replace("]", ""));
+                   if (index < 48) {
+                       isDefinedInputFloats[index] = true;
+                       label_inputTitle[index].setText(ioname);
+                   }
+
+               } else if (defname.indexOf("GP_float_out") != -1) {
+                   int index = Integer.valueOf(defname.replace("GP_float_out[", "").replace("]", ""));
+                   if (index < 48) {
+                       isDefinedOutputFloats[index] = true;
+                       label_outputTitle[index].setText(ioname);
+                   }
+
+               }
+
+           }
+
+           break;
+       default:
+           break;
+
+   }
+
+        // Rende le etichette visibili
+        for (int i = 0; i < 64; i++) {
+            label_inputTitle[i].setVisible(true);
+            //label_inputValue[i].setVisible(true);
+            label_outputTitle[i].setVisible(true);
+            switch (label_outputValue[i].getText()) {
+            case "0":
+            case "-":
+                label_outputValue[i].setVisible(false);
+                break;
+            default:
+                //label_outputValue[i].setVisible(true);
+                break;
+        }
+        }
+
+    }
+
+    private void clearFormTexts() {
+        for (int i = 0; i < 3; i++) {
+            radio_mode[i].setSelected(false);
+        }
+
+        // Nasconde tutte le etichette
+        for (int i = 0; i < 64; i++) {
+            label_inputTitle[i].setVisible(false);
+            label_inputValue[i].setVisible(false);
+            label_outputTitle[i].setVisible(false);
+            label_outputValue[i].setVisible(false);
+        }
+
+        for (int i = 0; i < 64; i++) {
+            label_inputTitle[i].setText("");
+            label_inputValue[i].setText("");
+            label_outputTitle[i].setText("");
+            label_outputValue[i].setText("");
+        }
+    }
+
+    private void disposeAllRTDEThreads() {
+        if (rtdeClientOfBitRegister != null) {
+            rtdeClientOfBitRegister.interrupt();
+            while (rtdeClientOfBitRegister.isAlive()) {
+                Thread.yield();
+            }
+            rtdeClientOfBitRegister = null;
+        }
+
+        if (rtdeClientOfIntegerRegister != null) {
+            rtdeClientOfIntegerRegister.interrupt();
+            while (rtdeClientOfIntegerRegister.isAlive()) {
+                Thread.yield();
+            }
+            rtdeClientOfIntegerRegister = null;
+        }
+
+        if (rtdeClientOfDoubleRegister != null) {
+            rtdeClientOfDoubleRegister.interrupt();
+            while (rtdeClientOfDoubleRegister.isAlive()) {
+                Thread.yield();
+            }
+            rtdeClientOfDoubleRegister = null;
+        }
+
+    }
+
+    private void startRTDEClient(int mode) {
+
+        switch (mode) {
+            case MODE_BITS:
+                rtdeClientOfBitRegister = new RTDEClientOfBitRegister(FREQ_BITS) {
+
+                    @Override
+                    public void onGetValues(final int input_bit_registers0_to_31, final int input_bit_registers32_to_63,
+                            final int output_bit_registers0_to_31, final int output_bit_registers32_to_63) {
+
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                setInputValueLower(input_bit_registers0_to_31, false);
+                                setInputValueUpper(input_bit_registers32_to_63, false);
+
+                                setOutputValueLower(output_bit_registers0_to_31, false);
+                                setOutputValueUpper(output_bit_registers32_to_63, false);
+
+                            }
+
+                        });
+
+                    }
+                };
+                setTextOfIOLabels(MODE_BITS);
+
+                rtdeClientOfBitRegister.start();
+
+                break;
+
+            case MODE_INTEGERS:
+                rtdeClientOfIntegerRegister = new RTDEClientOfIntegerRegister(FREQ_INTEGERS) {
+
+                    @Override
+                    public void onGetValues(final int[] input_int_registers, final int[] output_int_registers) {
+
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                            	
+                                for (int i = 0; i < 48; i++) {
+
+                                    Color forecolor = isDefinedInputIntegers[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                                    label_inputTitle[i]
+                                            .setForeground(input_int_registers[i] == 0 ? forecolor : ON_COLOR);
+                                    label_inputValue[i]
+                                            .setForeground(input_int_registers[i] == 0 ? forecolor : ON_COLOR);
+
+                                    forecolor = isDefinedOutputIntegers[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                                    label_outputTitle[i]
+                                            .setForeground(output_int_registers[i] == 0 ? forecolor : ON_COLOR);
+                                    label_outputValue[i]
+                                            .setForeground(output_int_registers[i] == 0 ? forecolor : ON_COLOR);
+                                   label_outputValue[i]
+                                    		.setForeground(output_int_registers[i] != 0 ? forecolor : BACKCOLOR);
+
+                                    if (!label_inputValue[i].getText().equals(String.valueOf(input_int_registers[i])))
+                                        label_inputValue[i].setText(String.valueOf(input_int_registers[i]));
+                                    if (!label_outputValue[i].getText().equals(String.valueOf(output_int_registers[i])))
+                                        label_outputValue[i].setText(String.valueOf(output_int_registers[i]));
+                                }
+                                //azzera i valori da 48 a 64
+                                for (int i = 48; i < 64; i++) {
+                                    label_inputValue[i].setText("");
+                                    label_outputValue[i].setText("");
+                                }
+                            }
+                        });
+
+                    }
+                };
+                setTextOfIOLabels(MODE_INTEGERS);
+
+                rtdeClientOfIntegerRegister.start();
+
+                break;
+
+            case MODE_FLOATS:
+                rtdeClientOfDoubleRegister = new RTDEClientOfDoubleRegister(FREQ_FLOATS) {
+
+                    @Override
+                    public void onGetValues(final double[] input_double_registers,
+                            final double[] output_double_registers) {
+
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                            	//errori partono da qui
+                                for (int i = 0; i < 48; i++) {
+
+                                	Color forecolor = isDefinedInputIntegers[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                                    label_inputTitle[i]
+                                            .setForeground(input_double_registers[i] == 0 ? forecolor : ON_COLOR);
+                                    label_inputValue[i]
+                                            .setForeground(input_double_registers[i] == 0 ? forecolor : ON_COLOR);
+
+                                    forecolor = isDefinedOutputFloats[i] ? DEFAULT_FORECOLOR : NOUSE_COLOR;
+
+                                    label_outputTitle[i]
+                                            .setForeground(output_double_registers[i] == 0 ? forecolor : ON_COLOR);
+                                    label_outputValue[i]
+                                            .setForeground(output_double_registers[i] == 0 ? forecolor : ON_COLOR);
+                                    label_outputValue[i]
+                                    		.setForeground(output_double_registers[i] != 0 ? forecolor : BACKCOLOR);
+                                    
+                                    if (!label_inputValue[i].getText()
+                                            .equals(String.valueOf(input_double_registers[i])))
+                                        label_inputValue[i].setText(String.format("%.3f", input_double_registers[i]));
+                                    if (!label_outputValue[i].getText()
+                                            .equals(String.valueOf(output_double_registers[i])))
+                                        label_outputValue[i].setText(String.format("%.3f", output_double_registers[i]));
+                                }
+                                //azzera i valora da i == 48 e <64
+                                for (int i = 48; i < 64; i++) {
+                                    label_inputValue[i].setText("");
+                                    label_outputValue[i].setText("");
+                                }
+
+                            }
+                        });
+
+                    }
+                };
+                setTextOfIOLabels(MODE_FLOATS);
+
+                rtdeClientOfDoubleRegister.start();
+
+                break;
+
+            default:
+                break;
+        }
+
+    }
+}
